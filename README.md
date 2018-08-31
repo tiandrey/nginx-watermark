@@ -65,4 +65,5 @@ Original patch: https://github.com/vdvm/nginx-watermark
 http://nginx.org/en/docs/http/ngx_http_image_filter_module.html#image_filter
 
 ## Tested with
-* nginx 1.12.0
+* nginx 1.14.0
+* nginx 1.12.0 (in branch nginx-1.12)
