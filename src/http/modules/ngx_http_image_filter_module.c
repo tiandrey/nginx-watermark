@@ -1153,6 +1153,10 @@ transparent:
                 gdImageCopy(watermark_mix, dst, 0, 0, wdx, wdy, watermark->sx, watermark->sy);
                 gdImageCopy(watermark_mix, watermark, 0, 0, 0, 0, watermark->sx, watermark->sy);
                 alpha = ngx_http_image_filter_get_value(r, conf->wacv, conf->alpha);
+                if (alpha > 100) {
+                  ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "incorrect watermark transparency: %d; assuming 100 (must be in range 0..100)", alpha);
+                  alpha = 100;
+                }
                 gdImageCopyMerge(dst, watermark_mix, wdx, wdy, 0, 0, watermark->sx, watermark->sy, alpha);
                 gdImageDestroy(watermark);
                 gdImageDestroy(watermark_mix);
@@ -1970,9 +1974,9 @@ ngx_http_image_filter_watermark_alpha(ngx_conf_t *cf, ngx_command_t *cmd,
     if (cv.lengths == NULL) {
         n = ngx_http_image_filter_value(&value[1]);
 
-        if (n < 0 || n > 100) {
+        if (n > 100) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "invalid value \"%V\"", &value[1]);
+                               "watermark_alpha must be in range 0..100, \"%V\" found", &value[1]);
             return NGX_CONF_ERROR;
         }
 
