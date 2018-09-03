@@ -36,14 +36,16 @@ Syntax:  image_filter_watermark_margin <margin_x> [<margin_y>];
 Default: image_filter_watermark_margin 10;
 Context: http, server, location
 ```
-Sets watermark margin size. Given only one value, sets it as both horizontal and vertical margin sizes. Given two values, sets it as horizontal and vertical sizes respectively.
+Sets watermark margin size. Given only one value, sets it as both horizontal and vertical margin sizes. Given two values, sets it as horizontal and vertical sizes respectively.  
+_Can contain expressions (e.g. combination of text and variables)._
 ___
 ```
 Syntax:  image_filter_watermark_alpha <alpha>;
 Default: image_filter_watermark_alpha 75;
 Context: http, server, location
 ```
-Sets watermark transparency. Must be between 0 and 100.
+Sets watermark transparency. Must be between 0 and 100.  
+_Can contain expressions (e.g. combination of text and variables)._
 ___
 ```
 Syntax:  image_filter_upscale on | off;
