@@ -46,7 +46,8 @@ typedef struct {
     ngx_uint_t                   jpeg_quality;
     ngx_uint_t                   webp_quality;
     ngx_uint_t                   sharpen;
-    ngx_uint_t                   margin;
+    ngx_uint_t                   margin_x;
+    ngx_uint_t                   margin_y;
     ngx_uint_t                   alpha;
 
     ngx_flag_t                   transparency;
@@ -61,6 +62,8 @@ typedef struct {
     ngx_http_complex_value_t    *jqcv;
     ngx_http_complex_value_t    *wqcv;
     ngx_http_complex_value_t    *shcv;
+    ngx_http_complex_value_t    *mxcv;
+    ngx_http_complex_value_t    *mycv;
     ngx_http_complex_value_t    *wacv;
 
     size_t                       buffer_size;
@@ -122,6 +125,8 @@ static char *ngx_http_image_filter_jpeg_quality(ngx_conf_t *cf,
 static char *ngx_http_image_filter_webp_quality(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 static char *ngx_http_image_filter_sharpen(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+static char *ngx_http_image_filter_watermark_margin(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_image_filter_watermark_alpha(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
@@ -201,10 +206,10 @@ static ngx_command_t  ngx_http_image_filter_commands[] = {
       NULL },
 
     { ngx_string("image_filter_watermark_margin"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_num_slot,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
+      ngx_http_image_filter_watermark_margin,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_image_filter_conf_t, margin),
+      0,
       NULL },
 
     { ngx_string("image_filter_watermark_alpha"),
@@ -1123,19 +1128,23 @@ transparent:
 
             if(watermark != NULL) {
                 ngx_uint_t alpha;
+                ngx_uint_t margin_x, margin_y;
                 watermark_mix = gdImageCreateTrueColor(watermark->sx, watermark->sy);
+                margin_x = ngx_http_image_filter_get_value(r, conf->mxcv, conf->margin_x);
+                margin_y = ngx_http_image_filter_get_value(r, conf->mycv, conf->margin_y);
 
                 if (ngx_strcmp(conf->watermark_position.data, "bottom-right") == 0) {
-                    wdx = dx - watermark->sx - conf->margin;
-                    wdy = dy - watermark->sy - conf->margin;
+                    wdx = dx - watermark->sx - margin_x;
+                    wdy = dy - watermark->sy - margin_y;
                 } else if (ngx_strcmp(conf->watermark_position.data, "top-left") == 0) {
-                    wdx = wdy = conf->margin;
+                    wdx = margin_x;
+                    wdy = margin_y;
                 } else if (ngx_strcmp(conf->watermark_position.data, "top-right") == 0) {
-                    wdx = dx - watermark->sx - conf->margin;
-                    wdy = conf->margin;
+                    wdx = dx - watermark->sx - margin_x;
+                    wdy = margin_y;
                 } else if (ngx_strcmp(conf->watermark_position.data, "bottom-left") == 0) {
-                    wdx = conf->margin;
-                    wdy = dy - watermark->sy - conf->margin;
+                    wdx = margin_x;
+                    wdy = dy - watermark->sy - margin_y;
                 } else if (ngx_strcmp(conf->watermark_position.data, "center") == 0) {
                     wdx = dx / 2 - watermark->sx / 2;
                     wdy = dy / 2 - watermark->sy / 2;
@@ -1402,13 +1411,17 @@ ngx_http_image_filter_create_conf(ngx_conf_t *cf)
      *     conf->jqcv = NULL;
      *     conf->wqcv = NULL;
      *     conf->shcv = NULL;
+     *     conf->mxcv = NULL;
+     *     conf->mycv = NULL;
+     *     conf->wacv = NULL;
      */
 
     conf->filter = NGX_CONF_UNSET_UINT;
     conf->jpeg_quality = NGX_CONF_UNSET_UINT;
     conf->webp_quality = NGX_CONF_UNSET_UINT;
     conf->sharpen = NGX_CONF_UNSET_UINT;
-    conf->margin = NGX_CONF_UNSET_UINT;
+    conf->margin_x = NGX_CONF_UNSET_UINT;
+    conf->margin_y = NGX_CONF_UNSET_UINT;
     conf->alpha = NGX_CONF_UNSET_UINT;
     conf->transparency = NGX_CONF_UNSET;
     conf->interlace = NGX_CONF_UNSET;
@@ -1475,8 +1488,17 @@ ngx_http_image_filter_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->upscale, prev->upscale, 0);
 
-    /* 10x10 is default watermark margin */
-    ngx_conf_merge_uint_value(conf->margin, prev->margin, 10);
+    if (conf->margin_x == NGX_CONF_UNSET_UINT) {
+
+      /* 10x10 is default watermark margin */
+      ngx_conf_merge_uint_value(conf->margin_x, prev->margin_x, 10);
+      ngx_conf_merge_uint_value(conf->margin_y, prev->margin_y, 10);
+
+      if (conf->mxcv == NULL) {
+          conf->mxcv = prev->mxcv;
+          conf->mycv = prev->mycv;
+      }
+    }
 
     if (conf->alpha == NGX_CONF_UNSET_UINT) {
 
@@ -1817,6 +1839,108 @@ ngx_http_image_filter_sharpen(ngx_conf_t *cf, ngx_command_t *cmd,
     }
 
     return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_http_image_filter_watermark_margin(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_image_filter_conf_t *imcf = conf;
+
+    ngx_str_t                         *value;
+    ngx_int_t                          n;
+    ngx_uint_t                         i;
+    ngx_http_complex_value_t           cv;
+    ngx_http_compile_complex_value_t   ccv;
+
+    value = cf->args->elts;
+
+    i = 1;
+
+    if (cf->args->nelts == 2) {
+
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+        ccv.cf = cf;
+        ccv.value = &value[i];
+        ccv.complex_value = &cv;
+
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
+
+        if (cv.lengths == NULL) {
+            n = ngx_http_image_filter_value(&value[i]);
+            imcf->margin_x = imcf->margin_y = (ngx_uint_t) n;
+
+        } else {
+            imcf->mxcv = imcf->mycv = ngx_palloc(cf->pool,
+                                   sizeof(ngx_http_complex_value_t));
+            if (imcf->mxcv == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            *imcf->mxcv = cv;
+        }
+
+        return NGX_CONF_OK;
+
+    } else if (cf->args->nelts == 3) {
+
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+        ccv.cf = cf;
+        ccv.value = &value[i];
+        ccv.complex_value = &cv;
+
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
+
+        if (cv.lengths == NULL) {
+            n = ngx_http_image_filter_value(&value[i]);
+            imcf->margin_x = (ngx_uint_t) n;
+
+        } else {
+            imcf->mxcv = ngx_palloc(cf->pool,
+                                   sizeof(ngx_http_complex_value_t));
+            if (imcf->mxcv == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            *imcf->mxcv = cv;
+        }
+
+        i++;
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+        ccv.cf = cf;
+        ccv.value = &value[i];
+        ccv.complex_value = &cv;
+
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
+
+        if (cv.lengths == NULL) {
+            n = ngx_http_image_filter_value(&value[i]);
+            imcf->margin_y = (ngx_uint_t) n;
+
+        } else {
+            imcf->mycv = ngx_palloc(cf->pool,
+                                   sizeof(ngx_http_complex_value_t));
+            if (imcf->mycv == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            *imcf->mycv = cv;
+        }
+
+        return NGX_CONF_OK;
+
+    } else {
+
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid parameters for \"image_filter_watermark_margin\"");
+
+        return NGX_CONF_ERROR;
+    }
 }
 
 

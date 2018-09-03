@@ -32,11 +32,11 @@ Context: http, server, location
 Sets position of watermark.
 ___
 ```
-Syntax:  image_filter_watermark_margin <margin>;
+Syntax:  image_filter_watermark_margin <margin_x> [<margin_y>];
 Default: image_filter_watermark_margin 10;
 Context: http, server, location
 ```
-Sets watermark margin.
+Sets watermark margin size. Given only one value, sets it as both horizontal and vertical margin sizes. Given two values, sets it as horizontal and vertical sizes respectively.
 ___
 ```
 Syntax:  image_filter_watermark_alpha <alpha>;
