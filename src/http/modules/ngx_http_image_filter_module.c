@@ -602,7 +602,7 @@ ngx_http_image_process(ngx_http_request_t *r)
 
     if (conf->filter == NGX_HTTP_IMAGE_WATERMARK) {
 
-        if (!conf->watermark.data) {
+        if (!conf->watermark.data || !conf->watermark.len) {
             return NULL;
         }
 
@@ -1112,7 +1112,7 @@ transparent:
         gdImageSharpen(dst, sharpen);
     }
 
-    if (conf->watermark.data) {
+    if (conf->watermark.data && conf->watermark.len) {
         FILE *watermark_file = fopen((const char *)conf->watermark.data, "r");
 
         if (watermark_file) {
