@@ -589,6 +589,11 @@ ngx_http_image_process(ngx_http_request_t *r)
         return ngx_http_image_json(r, rc == NGX_OK ? ctx : NULL);
     }
 
+    /* force ngx_http_image_resize() invocation in case watermark needs to be applied */
+    if (conf->watermark.data && conf->watermark.len) {
+        ctx->force = 1;
+    }
+
     ctx->angle = ngx_http_image_filter_get_value(r, conf->acv, conf->angle);
 
     if (conf->filter == NGX_HTTP_IMAGE_ROTATE) {
